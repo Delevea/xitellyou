@@ -2,12 +2,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
+using MySql.Data.MySqlClient;
+
 
 namespace xitellyou
 {
@@ -18,6 +17,8 @@ namespace xitellyou
     /// </summary>
     class itellyou
     {
+        private static string connString = "server=127.0.0.1;port=3306;user=root;password=root; database=test;";
+
         public void run()
         {
             ServicePointManager.ServerCertificateValidationCallback = new RemoteCertificateValidationCallback(CheckValidationResult);
@@ -29,80 +30,109 @@ namespace xitellyou
             * 所以这里就不解析主页数据
             * 而是直接写死在代码里
             **/
-            cateList.Add("企业解决方案",    "aff8a80f-2dee-4bba-80ec-611ac56d3849");
+            cateList.Add("企业解决方案", "aff8a80f-2dee-4bba-80ec-611ac56d3849");
             cateList.Add("MSDN 技术资源库", "23958de6-bedb-4998-825c-aa3d1e00d097");
-            cateList.Add("工具和资源",      "95c4acfd-d1a6-41fe-b14d-a6816973d2aa");
-            cateList.Add("应用程序",        "051d75ee-ff53-43fe-80e9-bac5c10fc0fb");
-            cateList.Add("开发人员工具",    "fcf12b78-0662-4dd4-9a82-72040db91c9e");
-            cateList.Add("操作系统",        "7ab5f0cb-7607-4bbe-9e88-50716dc43de6");
-            cateList.Add("服务器",          "36d3766e-0efb-491e-961b-d1a419e06c68");
-            cateList.Add("设计人员工具",    "5d6967f0-b58d-4385-8769-b886bfc2b78c");
+            cateList.Add("工具和资源", "95c4acfd-d1a6-41fe-b14d-a6816973d2aa");
+            cateList.Add("应用程序", "051d75ee-ff53-43fe-80e9-bac5c10fc0fb");
+            cateList.Add("开发人员工具", "fcf12b78-0662-4dd4-9a82-72040db91c9e");
+            cateList.Add("操作系统", "7ab5f0cb-7607-4bbe-9e88-50716dc43de6");
+            cateList.Add("服务器", "36d3766e-0efb-491e-961b-d1a419e06c68");
+            cateList.Add("设计人员工具", "5d6967f0-b58d-4385-8769-b886bfc2b78c");
 
-            foreach (var cate in cateList)
+            int index = 1;
+            //int indextype = 0;
+
+            MySqlConnection conn = new MySqlConnection(connString);
+
+            try
             {
-                string cateName = cate.Key;
-                string cateId = cate.Value;
+                conn.Open(); //创建数据库连接
 
-                ArrayList seriesList = getSeriesList(cateId);
+                string sql = @"DELETE FROM msdn";
+                MySqlCommand cmd = new MySqlCommand(sql, conn);
+                cmd.ExecuteNonQuery();
 
-                foreach (var seriesInfo in seriesList)
+                foreach (var cate in cateList)
                 {
-                    Hashtable t = seriesInfo as Hashtable;
-                    string seriesName = t["name"] as string;
-                    string seriesId = t["id"] as string;
+                    string cateName = cate.Key;
+                    string cateId = cate.Value;
 
-                    Hashtable langTable = getLangList(seriesId);
-                    ArrayList langList = langTable["result"] as ArrayList;
-                    foreach (var langInfo in langList)
+                    ArrayList seriesList = getSeriesList(cateId);
+
+                    foreach (var seriesInfo in seriesList)
                     {
-                        Hashtable tt = langInfo as Hashtable;
-                        string langId = tt["id"] as string;
-                        string langName = tt["lang"] as string;
+                        Hashtable t = seriesInfo as Hashtable;
+                        string seriesName = t["name"] as string;
+                        string seriesId = t["id"] as string;
 
-                        Hashtable result = getProductList(seriesId, langId);
-                        ArrayList productList = result["result"] as ArrayList;
-                        foreach (var productInfo in productList)
+                        Hashtable langTable = getLangList(seriesId);
+                        ArrayList langList = langTable["result"] as ArrayList;
+                        foreach (var langInfo in langList)
                         {
-                            Hashtable ttt = productInfo as Hashtable;
-                            string productId = ttt["id"] as string;
-                            string productName = ttt["name"] as string;
+                            Hashtable tt = langInfo as Hashtable;
+                            string langId = tt["id"] as string;
+                            string langName = tt["lang"] as string;
 
-                            Hashtable detailResult = getProductDetail(productId);
-                            Hashtable detail = detailResult["result"] as Hashtable;
-                            string url = detail["DownLoad"] as string;
-                            string filename = detail["FileName"] as string;
-                            string date = detail["PostDateString"] as string;
-                            string sha1 = detail["SHA1"] as string;
-                            string size = detail["size"] as string;
 
-                            // 直接保存到当前运行的目录
-                            string dir = cateName + "/" + seriesName + "/" + langName;
-                            string path = dir + "/" + filename + ".txt";
+                            Hashtable result = getProductList(seriesId, langId);
+                            ArrayList productList = result["result"] as ArrayList;
+                            foreach (var productInfo in productList)
+                            {
+                                Hashtable ttt = productInfo as Hashtable;
+                                string productId = ttt["id"] as string;
+                                string productName = ttt["name"] as string;
 
-                            if (Directory.Exists(dir) == false)
-                                Directory.CreateDirectory(dir);
+                                while (true)
+                                {
+                                    try
+                                    {
+                                        Hashtable detailResult = getProductDetail(productId);
+                                        Hashtable detail = detailResult["result"] as Hashtable;
+                                        string url = detail["DownLoad"] as string;
+                                        string filename = detail["FileName"] as string;
+                                        string date = detail["PostDateString"] as string;
+                                        string sha1 = detail["SHA1"] as string;
+                                        string size = detail["size"] as string;
 
-                            // 输出到文件
-                            FileStream f = File.Open(path, FileMode.Create);
-                            StreamWriter w = new StreamWriter(f);
-                            w.WriteLine("文件名    = " + filename);
-                            w.WriteLine("SHA1      = " + sha1);
-                            w.WriteLine("文件大小  = " + size);
-                            w.WriteLine("发布时间  = " + date);
-                            w.WriteLine("下载链接  = " + url);
-                            w.Close();
-                            f.Close();
+                                        // 输出到控制台
+                                        Console.WriteLine("文件名    = " + filename);
+                                        Console.WriteLine("SHA1      = " + sha1);
+                                        Console.WriteLine("文件大小  = " + size);
+                                        Console.WriteLine("发布时间  = " + date);
+                                        Console.WriteLine("下载链接  = " + url);
+                                        Console.WriteLine();
 
-                            // 输出到控制台
-                            Console.WriteLine("文件名    = " + filename);
-                            Console.WriteLine("SHA1      = " + sha1);
-                            Console.WriteLine("文件大小  = " + size);
-                            Console.WriteLine("发布时间  = " + date);
-                            Console.WriteLine("下载链接  = " + url);
-                            Console.WriteLine();
+                                        //插入到数据库
+                                        sql = @"INSERT INTO msdn VALUES(" + index + ",'" + cateName + "','" + filename +
+                                              "','" + sha1 + "','" + size + "','" + date + "','" + url + "')";
+                                        cmd = new MySqlCommand(sql, conn);
+                                        cmd.ExecuteNonQuery();
+
+                                        index++;
+                                        break;
+                                    }
+                                    catch (Exception)
+                                    {
+
+                                    }
+
+                                }
+
+
+
+                            }
                         }
                     }
+                    //indextype++;
                 }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+            finally
+            {
+                conn.Close();
             }
 
         }
